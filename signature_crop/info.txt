@@ -1,0 +1,128 @@
+Domande:
+
+- Possiamo creare un form template per creare un modulo di riconoscimento OMR di più firme?
+- La zona di riconoscimento meglio se non comprende la riga
+- Si può avere una funzione OCR di riconoscimento di tipo "riconosci quello che sta dopo questa parola"?
+- Riesco a passare all'SDK un puntatore a un file già aperto in memoria? Dice di sì, ma quale chiamata?
+- vedere se possiamo migliorare l'immagine prima di processarla con OMR
+	http://docs.gimp.org/en/plug-in-despeckle.html
+	kRecDespeckleImg
+- Errore nella documentazione:
+	Barcode recognition modules. The BAR_AMP module is supported on: Windows, Linux, Embedded Linux, Android.
+
+=============================================
+
+delega3ok - le due firme
+delega4ok - solo la firma
+delega5ok - 6 firme (no storico)
+ 
+Sample12.cpp - Forms
+Sample25.cpp - Add/Update Zone
+Sample34.cpp - OMR recog.
+
+Supporto sulle varie piattaforme
+file:///usr/local/share/doc/nuance-omnipage-csdk-19.2-15521.100/recapi/PLATFORMS.html
+
+Data type Windows
+https://msdn.microsoft.com/en-us/library/windows/desktop/aa383751(v=vs.85).aspx
+
+=============================================
+
+>>> import ctypes
+>>> dll = ctypes.cdll.LoadLibrary("/usr/local/lib/nuance-omnipage-csdk-lib64-19.2-15521.100/libkernelapi.so")
+>>> hPage = None
+>>> dll.kRecLoadImgFA(0, "tests/esempio_qr_manunico.pdf", hPage, 0)
+
+# Delega tipo 3
+./zones -i tests/tipo3/template.tiff -z zone_data/delega_tipo_3/zone_data.txt
+./omr -d tests/tipo3/ -z zone_data/delega_tipo_3/all.zon
+
+# Delega tipo 4
+./omr -d tests/tipo4/subset/ -z zone_data/delega_tipo_4/sigs_6_150dpi.zon
+test: ./zones -i tests/tipo4/pdf/tipo_04_01.pdf
+
+convert -compress Group4 -monochrome -density 150 tests/tipo3/YN/zncntn56e27b354u_00115_06582_02_deltit.pdf /tmp/src.tiff
+convert -density 150 -compress Group4 -alpha off tests/tipo3/YN/zncntn56e27b354u_00115_06582_02_deltit.pdf /tmp/src.tiff
+
+gs -dNOPAUSE -dBATCH -sDEVICE=tiffg4 -sOutputFile=page.tiff -dFirstPage=1 -dLastPage=1 -r150 -fzncntn56e27b354u_00115_06582_02_deltit.pdf
+
+strace -e trace=process,open gimp -i -b '(from-pdf-to-group4 "*.pdf")' -b '(gimp-quit 0)'
+# scheme
+gimp -i -b '(from-pdf-to-group4 "*.pdf")' -b '(gimp-quit 0)'
+# python
+gimp -i -b '(python-fu-tiffg4-batch RUN-NONINTERACTIVE "*.pdf" FALSE 150)' -b '(gimp-quit 0)'
+
+brtmra... firma colorata, ammazzo la firma
+
+=============================================
+
+controllo caccole, prendo la regione, faccio una finestra mobile di 4x4.
+Vedo quante zone di 4 pixel neri ho.
+
+prendere un'altra zona vicina che so essere vuota e vedo la differenza.
+
+imagemagick despeckle : incrementa il contrasto (simile al canned edge detector)
+
+$ convert firma.tif -format %c histogram:info:
+      2718: (  0,  0,  0) #000000 gray(0)
+     48882: (255,255,255) #FFFFFF gray(255)
+
+=============================================
+
+300dpi USE_LOCAL_TIFF 1 PDF
+
+real	0m6.124s
+user	0m7.004s
+sys	0m0.544s
+
+150dpi 1 PDF
+
+real	0m2.442s
+user	0m2.720s
+sys	0m0.172s
+
+=============================================
+
+CMYK to RGB
+http://cimg.eu/reference/structcimg__library_1_1CImg.html#ac59bacaa7b500f54351ebc11a2a4fc1d
+
+=============================================
+
+OpenCV blobdetector
+
+vedere opencv_blob.py e provare a installare il cazzo di OpenCV 3 con Python 3
+https://www.pyimagesearch.com/2015/07/20/install-opencv-3-0-and-python-3-4-on-ubuntu/
+
+=============================================
+
+SVG
+
+potrace in.bmp -s --group --tight -o svg/out.svg
+autotrace firma.tif --output-file firma_autotrace.svg
+
+# pacchetti python per inkscape
+$ pip install lxml numpy
+- doppio click sul path per selezionarlo
+- Extensions > Visualize Path > Measure Path
+(viene sovrimpressa la lunghezza del path sull'immagine)
+
+from svgpathtools import Path, Line, QuadraticBezier, CubicBezier, Arc, parse_path, svg2paths
+paths, attributes = svg2paths("prova.svg")
+paths[0].length(error=1e-5)
+
+from svgpathtools import svg2paths
+paths = None
+attributes = None
+paths, attributes = svg2paths("prova_simplified.svg")
+paths[0].length(error=1e-5)
+
+./omr -d tests/tipo3/YN/tiff_gimp_script/ -z zone_data/delega_tipo_3/all_150dpi.zon
+rm -rf mappa/bmp/* mappa/svg/*
+cp /tmp/*zone.?.bmp mappa/bmp
+for i in bmp/*; do potrace bmp/$i -s --tight -o svg/`basename $i .bmp`.svg; done
+python evaluate_svg.py svg/
+
+./omr -d tests/tipo4/tiff_150dpi/ -z zone_data/delega_tipo_3/all_150dpi.zon
+cp /tmp/*zone.?.bmp mappa/bmp
+for i in bmp/*; do potrace bmp/$i -s --tight -o svg/`basename $i .bmp`.svg; done
+python evaluate_svg.py svg/

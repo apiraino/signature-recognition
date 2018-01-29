@@ -1,0 +1,7 @@
+omr
+*.csv
+*.bmp
+*.svg
+*.whl
+tests
+*.o
